@@ -1,0 +1,71 @@
+import asyncio
+import time
+from telethon import TelegramClient, events
+from telethon.tl.types import UserStatusOnline, UserStatusOffline
+
+# Получаем тут: https://my.telegram.org/apps
+api_id = 1234567  # введи свой
+api_hash = 'твой_api_hash'  # введи свой
+phone = '+380675289791'  # твой номер
+
+client = TelegramClient('session_name', api_id, api_hash)
+
+# База ответов
+responses = {
+    'привет': ['Привет!', 'Здарова!', 'Приветствую!'],
+    'как дела': ['Норм!', 'Всё ок', 'Бывало лучше)'],
+    'где ты': ['Не онлайн, отвечу позже', 'Скоро вернусь'],
+    'нужно срочно': ['Не могу сейчас ответить, напиши позже'],
+    'пока': ['Бывай!', 'Удачи!'],
+    'default': ['Сейчас не могу ответить, но скоро увижу сообщение']
+}
+
+# Список ID, кому отвечать (можно настроить)
+ALLOWED_USERS = []  # оставь пустым для ответа всем
+# или добавь ID: [123456789, 987654321]
+
+# Функция выбора ответа
+def get_response(message):
+    msg_lower = message.lower()
+    for key in responses:
+        if key != 'default' and key in msg_lower:
+            return responses[key][0]  # берём первый вариант
+    return responses['default'][0]
+
+@client.on(events.NewMessage(incoming=True))
+async def handler(event):
+    # Проверяем, что это личное сообщение (не чат/канал)
+    if not event.is_private:
+        return
+    
+    sender = await event.get_sender()
+    
+    # Если указаны разрешённые пользователи
+    if ALLOWED_USERS and sender.id not in ALLOWED_USERS:
+        return
+    
+    # Проверяем твой статус (онлайн/офлайн)
+    me = await client.get_me()
+    my_status = await client.get_entity(me.id)
+    
+    # Автоответ только если ты офлайн (или всегда)
+    auto_reply = True  # меняй на False если хочешь только при офлайне
+    
+    if auto_reply:
+        # Задержка перед ответом (чтобы не сразу)
+        await asyncio.sleep(2)
+        
+        # Отправляем ответ
+        response_text = get_response(event.message.message)
+        await event.reply(f"🤖 Автоответ: {response_text}")
+        
+        # Логируем
+        print(f"[{time.ctime()}] Ответил {sender.first_name}: {event.message.message}")
+
+async def main():
+    await client.start(phone)
+    print("Бот запущен! Отвечаю в ЛС...")
+    await client.run_until_disconnected()
+
+if __name__ == '__main__':
+    client.loop.run_until_complete(main())
